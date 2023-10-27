@@ -1,0 +1,30 @@
+POST: http://localhost:8080/api/product
+{
+    "name": "Linguiço Calabreso",
+    "description": "Linguiço Calabreso Sem Pimento",
+    "price": 5.99
+}
+GET: http://localhost:8080/api/product
+------------------------------------------------
+GET: http://localhost:8082/api/inventory/iphone-16-pro
+------------------------------------------------
+POST: http://localhost:8081/api/order
+{
+    "orderLineItemsDtoList": [
+        {
+            "skuCode": "iphone_16",
+            "price": 1200,
+            "quantity": 1
+        },
+		{
+            "skuCode": "iphone-16-pro",
+            "price": 1200,
+            "quantity": 1
+        },
+		{
+            "skuCode": "iphone-16-max-pro",
+            "price": 1200,
+            "quantity": 1
+        },
+    ]
+}

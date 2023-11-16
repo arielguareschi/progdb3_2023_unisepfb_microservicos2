@@ -7,6 +7,7 @@ import br.unisep.edu.pdb3.orderservice.model.Order;
 import br.unisep.edu.pdb3.orderservice.model.OrderLineItems;
 import br.unisep.edu.pdb3.orderservice.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -51,11 +52,10 @@ public class OrderService {
 
         InventoryResponse[] inventoryResponseArray = webClientBuilder
                 .build()
-                .get()
-                .uri("http://localhost:8082/api/inventory",
-                        uriBuilder -> uriBuilder
-                                .queryParam("skuCode", skuCodes)
-                                .build())
+                .post()
+                .uri("http://inventory-service/api/inventory")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(skuCodes)
                 .retrieve()
                 .bodyToMono(InventoryResponse[].class)
                 .block();

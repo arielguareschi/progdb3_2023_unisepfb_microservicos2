@@ -19,4 +19,9 @@ public class InventoryController {
     public List<InventoryResponse> isInStock(@PathVariable("sku-code") List<String> skuCode){
         return inventoryService.isInStock(skuCode);
     }
+    @PostMapping
+    @ResponseStatus(HttpStatus.OK)
+    public List<InventoryResponse> isInStockPost(@RequestBody List<String> skuCode){
+        return inventoryService.isInStock(skuCode);
+    }
 }

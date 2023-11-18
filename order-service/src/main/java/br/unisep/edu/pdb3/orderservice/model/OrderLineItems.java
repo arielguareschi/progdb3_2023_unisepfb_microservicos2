@@ -12,13 +12,12 @@ import java.math.BigDecimal;
 @Table(name = "tb_order_line_items")
 @Getter
 @Setter
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
 public class OrderLineItems {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     private String skuCode;
     private BigDecimal price;
     private Integer quantity;

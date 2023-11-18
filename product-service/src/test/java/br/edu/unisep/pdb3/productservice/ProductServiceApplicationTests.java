@@ -20,55 +20,47 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 @SpringBootTest
-@Testcontainers
 @AutoConfigureMockMvc
 class ProductServiceApplicationTests {
 
 	@Container
-	static MongoDBContainer mongoDBContainer =
-			new MongoDBContainer(
-					"mongo:4.4.2");
-
+	static MongoDBContainer mongoDBContainer = new MongoDBContainer("mongo:4.4.2");
 	@Autowired
 	private MockMvc mockMvc;
-
 	@Autowired
 	private ObjectMapper objectMapper;
-
 	@Autowired
 	private ProductRepository productRepository;
 
-	@DynamicPropertySource
-	static void setProperties(
-			DynamicPropertyRegistry
-					dynamicPropertyRegistry){
-		dynamicPropertyRegistry.add(
-				"spring.data.mongodb.uri",
-				mongoDBContainer::getReplicaSetUrl);
+	static {
+		mongoDBContainer.start();
 	}
 
-	private ProductRequest getProductRequest(){
-		return ProductRequest.builder()
-				.name("Iphone 17")
-				.description("O revolucionario USB A")
-				.price(BigDecimal.valueOf(150000))
-				.build();
+	@DynamicPropertySource
+	static void setProperties(DynamicPropertyRegistry dymDynamicPropertyRegistry) {
+		dymDynamicPropertyRegistry.add("spring.data.mongodb.uri", mongoDBContainer::getReplicaSetUrl);
 	}
 
 	@Test
-	void shouldCreateProduct() throws Exception{
+	void shouldCreateProduct() throws Exception {
 		ProductRequest productRequest = getProductRequest();
-		String productRequestString = objectMapper
-				.writeValueAsString(productRequest);
-		mockMvc.perform(MockMvcRequestBuilders
-						.post("/api/products")
+		String productRequestString = objectMapper.writeValueAsString(productRequest);
+		mockMvc.perform(MockMvcRequestBuilders.post("/api/product")
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(productRequestString)
-						)
-				.andExpect(MockMvcResultMatchers
-						.status().isCreated());
-		Assertions.assertEquals(1,
-				productRepository.findAll().size());
+						.content(productRequestString))
+				.andExpect(status().isCreated());
+		Assertions.assertEquals(1, productRepository.findAll().size());
 	}
+
+	private ProductRequest getProductRequest() {
+		return ProductRequest.builder()
+				.name("iPhone 17")
+				.description("iPhone 17")
+				.price(BigDecimal.valueOf(11999))
+				.build();
+	}
+
 }

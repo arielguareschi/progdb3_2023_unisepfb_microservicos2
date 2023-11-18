@@ -3,10 +3,15 @@ package br.unisep.edu.pdb3.orderservice.service;
 import br.unisep.edu.pdb3.orderservice.dto.InventoryResponse;
 import br.unisep.edu.pdb3.orderservice.dto.OrderLineItemsDto;
 import br.unisep.edu.pdb3.orderservice.dto.OrderRequest;
+import br.unisep.edu.pdb3.orderservice.event.OrderPlacedEvent;
 import br.unisep.edu.pdb3.orderservice.model.Order;
 import br.unisep.edu.pdb3.orderservice.model.OrderLineItems;
 import br.unisep.edu.pdb3.orderservice.repository.OrderRepository;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,10 +25,56 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class OrderService {
 
     private final OrderRepository orderRepository;
     private final WebClient.Builder webClientBuilder;
+    private final ObservationRegistry observationRegistry;
+    private final ApplicationEventPublisher applicationEventPublisher;
+
+    public String placeOrder(OrderRequest orderRequest) {
+        Order order = new Order();
+        order.setOrderNumber(UUID.randomUUID().toString());
+
+        List<OrderLineItems> orderLineItems = orderRequest.getOrderLineItemsDtoList()
+                .stream()
+                .map(this::mapToDto)
+                .toList();
+
+        order.setOrderLineItemsList(orderLineItems);
+
+        List<String> skuCodes = order.getOrderLineItemsList().stream()
+                .map(OrderLineItems::getSkuCode)
+                .toList();
+
+        // Call Inventory Service, and place order if product is in
+        // stock
+        Observation inventoryServiceObservation = Observation.createNotStarted("inventory-service-lookup",
+                this.observationRegistry);
+        inventoryServiceObservation.lowCardinalityKeyValue("call", "inventory-service");
+        return inventoryServiceObservation.observe(() -> {
+            InventoryResponse[] inventoryResponseArray = webClientBuilder.build().get()
+                    .uri("http://inventory-service/api/inventory",
+                            uriBuilder -> uriBuilder.queryParam("skuCode", skuCodes).build())
+                    .retrieve()
+                    .bodyToMono(InventoryResponse[].class)
+                    .block();
+
+            boolean allProductsInStock = Arrays.stream(inventoryResponseArray)
+                    .allMatch(InventoryResponse::isInStock);
+
+            if (allProductsInStock) {
+                orderRepository.save(order);
+                // publish Order Placed Event
+                applicationEventPublisher.publishEvent(new OrderPlacedEvent(this, order.getOrderNumber()));
+                return "Ordem gravada";
+            } else {
+                throw new IllegalArgumentException("Produto sem estoque tente de novo!");
+            }
+        });
+
+    }
 
     private OrderLineItems mapToDto(OrderLineItemsDto orderLineItemsDto) {
         OrderLineItems orderLineItems = new OrderLineItems();
@@ -31,41 +82,5 @@ public class OrderService {
         orderLineItems.setQuantity(orderLineItemsDto.getQuantity());
         orderLineItems.setSkuCode(orderLineItemsDto.getSkuCode());
         return orderLineItems;
-    }
-
-
-    public void placeOrder(OrderRequest orderRequest) {
-        Order order = new Order();
-        order.setOrderNumber(UUID.randomUUID().toString());
-        List<OrderLineItems> orderLineItems = orderRequest
-                .getOrderLineItemsDtoList()
-                .stream()
-                .map(this::mapToDto)
-                .toList();
-        order.setOrderLineItemsList(orderLineItems);
-
-        List<String> skuCodes = order
-                .getOrderLineItemsList()
-                .stream()
-                .map(OrderLineItems::getSkuCode)
-                .toList();
-
-        InventoryResponse[] inventoryResponseArray = webClientBuilder
-                .build()
-                .post()
-                .uri("http://inventory-service/api/inventory")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(skuCodes)
-                .retrieve()
-                .bodyToMono(InventoryResponse[].class)
-                .block();
-
-        boolean allProductInStock = Arrays.stream(inventoryResponseArray)
-                .allMatch(InventoryResponse::isInStock);
-        if (allProductInStock) {
-            orderRepository.save(order);
-        } else {
-            throw new IllegalArgumentException("Produto sem estoque");
-        }
     }
 }
